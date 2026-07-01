@@ -1,9 +1,11 @@
+import { getGoogleMapsApiKey } from "@/lib/maps/config";
+
 export function buildStaticMapUrl(
   latitude: number,
   longitude: number,
   options?: { width?: number; height?: number; zoom?: number }
 ): string | null {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const key = getGoogleMapsApiKey();
   if (!key) return null;
 
   const w = options?.width ?? 640;

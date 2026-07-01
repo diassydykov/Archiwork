@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { getGoogleMapsApiKey } from "@/lib/maps/config";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
 
-  const key = process.env.GOOGLE_MAPS_API_KEY;
+  const key = getGoogleMapsApiKey();
   if (!key) {
     return NextResponse.json({ error: "Maps API not configured" }, { status: 500 });
   }

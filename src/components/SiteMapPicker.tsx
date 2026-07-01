@@ -1,7 +1,7 @@
 "use client";
 
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 
 const ALMATY_CENTER = { lat: 43.238949, lng: 76.945465 };
@@ -22,14 +22,79 @@ interface SiteMapPickerProps {
   }) => void;
 }
 
-export function SiteMapPicker({
+export function SiteMapPicker(props: SiteMapPickerProps) {
+  const { t } = useI18n();
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [keyState, setKeyState] = useState<"loading" | "ready" | "missing">(
+    "loading"
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadKey() {
+      const envKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (envKey) {
+        if (!cancelled) {
+          setApiKey(envKey);
+          setKeyState("ready");
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/maps/config");
+        const data = await res.json();
+        if (!cancelled) {
+          if (data.apiKey) {
+            setApiKey(data.apiKey);
+            setKeyState("ready");
+          } else {
+            setKeyState("missing");
+          }
+        }
+      } catch {
+        if (!cancelled) setKeyState("missing");
+      }
+    }
+
+    loadKey();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (keyState === "loading") {
+    return (
+      <div
+        className="flex h-80 items-center justify-center rounded-xl"
+        style={{ backgroundColor: "var(--bg-accent)" }}
+      >
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {t("mapLoading")}
+        </p>
+      </div>
+    );
+  }
+
+  if (keyState === "missing" || !apiKey) {
+    return (
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        {t("mapNotConfigured")}
+      </p>
+    );
+  }
+
+  return <SiteMapPickerMap apiKey={apiKey} {...props} />;
+}
+
+function SiteMapPickerMap({
+  apiKey,
   latitude,
   longitude,
   onLocationChange,
-}: SiteMapPickerProps) {
+}: SiteMapPickerProps & { apiKey: string }) {
   const { t } = useI18n();
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
-
   const [mapType, setMapType] = useState<"hybrid" | "roadmap">("hybrid");
   const [resolving, setResolving] = useState(false);
 
@@ -46,9 +111,7 @@ export function SiteMapPicker({
     async (lat: number, lng: number) => {
       setResolving(true);
       try {
-        const res = await fetch(
-          `/api/geocode?lat=${lat}&lng=${lng}`
-        );
+        const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
         const data = await res.json();
         onLocationChange({
           latitude: lat,
@@ -74,14 +137,6 @@ export function SiteMapPicker({
     [reverseGeocode]
   );
 
-  if (!apiKey) {
-    return (
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        {t("mapNotConfigured")}
-      </p>
-    );
-  }
-
   if (loadError) {
     return (
       <p className="text-sm" style={{ color: "#dc2626" }}>
@@ -106,7 +161,10 @@ export function SiteMapPicker({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <p
+          className="text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           {t("mapSiteTitle")}
         </p>
         <div className="flex gap-1">

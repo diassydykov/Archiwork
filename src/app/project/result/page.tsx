@@ -20,7 +20,6 @@ import {
   sheetFileName,
 } from "@/lib/pdf/sheet-export";
 import type { ProjectDetails, ProjectSheetResult } from "@/types";
-import { buildStaticMapUrl } from "@/lib/maps/static";
 
 export default function ProjectResultPage() {
   return (
@@ -446,15 +445,10 @@ function ActionButton({
 
 function SiteBindingSection({ project }: { project: ProjectDetails }) {
   const { t } = useI18n();
-  const mapUrl =
-    project.latitude != null && project.longitude != null
-      ? buildStaticMapUrl(project.latitude, project.longitude, {
-          width: 800,
-          height: 400,
-        })
-      : null;
 
-  if (!mapUrl) return null;
+  if (project.latitude == null || project.longitude == null) return null;
+
+  const mapUrl = `/api/maps/static?lat=${project.latitude}&lng=${project.longitude}&width=800&height=400`;
 
   return (
     <section
