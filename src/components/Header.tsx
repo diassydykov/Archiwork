@@ -2,6 +2,7 @@
 
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+import { Logo } from "./Logo";
 import { useAuth } from "@/lib/auth/context";
 import { useI18n } from "@/lib/i18n/context";
 import { useRouter } from "next/navigation";
@@ -22,23 +23,7 @@ export function Header({ showLogout = false }: HeaderProps) {
 
   return (
     <header className="flex items-center justify-between py-4">
-      <div className="flex items-center gap-3">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-lg font-bold"
-          style={{
-            backgroundColor: "var(--accent)",
-            color: "#fff",
-          }}
-        >
-          A
-        </div>
-        <span
-          className="text-lg font-semibold tracking-tight"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Archiwork
-        </span>
-      </div>
+      <Logo />
 
       <div className="flex items-center gap-3">
         <LanguageSwitcher />

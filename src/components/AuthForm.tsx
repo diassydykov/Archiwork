@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth/context";
 import { useI18n } from "@/lib/i18n/context";
 import { Input } from "./ui/Input";
 import { Button } from "./ui/Button";
+import { Logo } from "./Logo";
 
 interface AuthFormProps {
   mode: "login" | "register";
@@ -63,6 +64,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       }}
     >
       <div className="mb-8 text-center">
+        <div className="mb-6 flex justify-center">
+          <Logo size={80} />
+        </div>
         <h1
           className="text-2xl font-semibold tracking-tight"
           style={{ color: "var(--text-primary)" }}

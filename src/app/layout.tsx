@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: "Archiwork — Генератор архитектурных проектов",
   description:
     "Генератор архитектурных проектов для частных домов и коммерческих зданий",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
