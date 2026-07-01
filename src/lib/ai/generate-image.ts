@@ -1,6 +1,10 @@
 import { generateWithLeonardo } from "@/lib/leonardo/client";
 import { generateWithStability } from "@/lib/stability/client";
 import {
+  generateWithGrokImagine,
+  isGrokImagineConfigured,
+} from "@/lib/xai/imagine";
+import {
   ImageProviderError,
   isLeonardoTokensExhausted,
 } from "@/lib/ai/provider-errors";
@@ -13,6 +17,8 @@ export interface GenerateImageOptions {
   preferLeonardo?: boolean;
 }
 
+export type ImageFallbackProvider = "grok-imagine" | "stability";
+
 export async function generateImageFromPrompt(
   prompt: string,
   aspectRatio: "16:9" | "1:1" | "4:5" = "16:9",
@@ -23,6 +29,7 @@ export async function generateImageFromPrompt(
   prompt: string;
   referenceImageId?: string;
   fallbackFromLeonardo?: boolean;
+  fallbackProvider?: ImageFallbackProvider;
 }> {
   const stubProject: ProjectDetails = {
     buildingType: "residential",
@@ -38,8 +45,9 @@ export async function generateImageFromPrompt(
 
   const hasStability = !!process.env.STABILITY_API_KEY;
   const hasLeonardo = !!process.env.LEONARDO_API_KEY;
+  const hasGrokImagine = isGrokImagineConfigured();
 
-  if (!hasStability && !hasLeonardo) {
+  if (!hasStability && !hasLeonardo && !hasGrokImagine) {
     throw new ImageProviderError("NO_PROVIDER", "No AI provider configured");
   }
 
@@ -49,6 +57,17 @@ export async function generateImageFromPrompt(
       : aspectRatio === "4:5"
         ? { width: 832, height: 1024 }
         : { width: 1024, height: 768 };
+
+  async function runGrokImagine() {
+    const result = await generateWithGrokImagine(prompt, aspectRatio, {
+      blueprint: options?.blueprint,
+    });
+    return {
+      image: result.images[0],
+      provider: result.provider,
+      prompt: result.prompt,
+    };
+  }
 
   async function runStability() {
     const result = await generateWithStability(
@@ -78,42 +97,62 @@ export async function generateImageFromPrompt(
     };
   }
 
+  async function runFallback(): Promise<{
+    image: string;
+    provider: string;
+    prompt: string;
+    fallbackProvider: ImageFallbackProvider;
+  }> {
+    if (hasGrokImagine) {
+      try {
+        const grok = await runGrokImagine();
+        return { ...grok, fallbackProvider: "grok-imagine" };
+      } catch (grokError) {
+        console.warn("Grok Imagine failed:", grokError);
+        if (!hasStability) throw grokError;
+      }
+    }
+
+    if (hasStability) {
+      const stability = await runStability();
+      return { ...stability, fallbackProvider: "stability" };
+    }
+
+    throw new ImageProviderError(
+      "LEONARDO_NO_TOKENS",
+      "Leonardo tokens exhausted and no fallback provider available"
+    );
+  }
+
   const tryLeonardoFirst = hasLeonardo && (options?.preferLeonardo ?? false);
 
   if (tryLeonardoFirst) {
     try {
       return await runLeonardo();
     } catch (error) {
-      if (isLeonardoTokensExhausted(error) && hasStability) {
-        console.warn(
-          "Leonardo tokens exhausted — falling back to Stability AI"
-        );
-        const stability = await runStability();
-        return { ...stability, fallbackFromLeonardo: true };
+      if (isLeonardoTokensExhausted(error) || hasGrokImagine || hasStability) {
+        console.warn("Leonardo unavailable — trying Grok Imagine / Stability");
+        const fallback = await runFallback();
+        return {
+          ...fallback,
+          fallbackFromLeonardo: true,
+          fallbackProvider: fallback.fallbackProvider,
+        };
       }
-
-      if (isLeonardoTokensExhausted(error)) {
-        throw new ImageProviderError(
-          "LEONARDO_NO_TOKENS",
-          "Leonardo API tokens exhausted"
-        );
-      }
-
-      if (hasStability) {
-        console.warn("Leonardo failed — falling back to Stability AI:", error);
-        const stability = await runStability();
-        return { ...stability, fallbackFromLeonardo: true };
-      }
-
       throw error;
     }
   }
 
-  if (hasStability) {
+  if (hasGrokImagine && !hasLeonardo) {
+    return runGrokImagine();
+  }
+
+  if (hasStability && !hasLeonardo) {
     try {
       return await runStability();
     } catch (error) {
-      if (!hasLeonardo) throw error;
+      if (hasGrokImagine) return runGrokImagine();
+      throw error;
     }
   }
 
@@ -124,11 +163,13 @@ export async function generateImageFromPrompt(
   try {
     return await runLeonardo();
   } catch (error) {
-    if (isLeonardoTokensExhausted(error)) {
-      throw new ImageProviderError(
-        "LEONARDO_NO_TOKENS",
-        "Leonardo API tokens exhausted"
-      );
+    if (isLeonardoTokensExhausted(error) || hasGrokImagine || hasStability) {
+      const fallback = await runFallback();
+      return {
+        ...fallback,
+        fallbackFromLeonardo: true,
+        fallbackProvider: fallback.fallbackProvider,
+      };
     }
     throw error;
   }

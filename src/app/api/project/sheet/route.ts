@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       provider: result.provider,
       referenceImageId: result.referenceImageId,
       fallbackFromLeonardo: result.fallbackFromLeonardo,
+      fallbackProvider: result.fallbackProvider,
       promptEnhancedBy: enhancer !== "none" ? enhancer : undefined,
     });
   } catch (error) {

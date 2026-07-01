@@ -43,7 +43,9 @@ function ResultContent() {
   const [error, setError] = useState("");
   const [designLock, setDesignLock] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [stabilityFallback, setStabilityFallback] = useState(false);
+  const [fallbackNotice, setFallbackNotice] = useState<
+    "grok-imagine" | "stability" | null
+  >(null);
 
   const projectTitle =
     project?.buildingType === "residential"
@@ -63,7 +65,7 @@ function ResultContent() {
       setSpecification("");
       setSheets([]);
       setDesignLock("");
-      setStabilityFallback(false);
+      setFallbackNotice(null);
       setPhase("spec");
 
       const sheetDefs = getSheetGenerationOrder(getProjectSheets(projectData));
@@ -126,7 +128,11 @@ function ResultContent() {
             }
 
             if (data.fallbackFromLeonardo) {
-              setStabilityFallback(true);
+              const provider = data.fallbackProvider as
+                | "grok-imagine"
+                | "stability"
+                | undefined;
+              setFallbackNotice(provider ?? "grok-imagine");
             }
 
             if (data.referenceImageId) {
@@ -426,7 +432,7 @@ function ResultContent() {
                   </div>
                 )}
               </div>
-              {stabilityFallback && (
+              {fallbackNotice && (
                 <p
                   className="mb-4 rounded-xl px-4 py-3 text-sm"
                   style={{
@@ -435,7 +441,9 @@ function ResultContent() {
                     border: "1px solid var(--border)",
                   }}
                 >
-                  {t("stabilityFallback")}
+                  {fallbackNotice === "grok-imagine"
+                    ? t("grokImagineFallback")
+                    : t("stabilityFallback")}
                 </p>
               )}
               <div className="grid gap-6 sm:grid-cols-2">

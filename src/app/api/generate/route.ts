@@ -6,6 +6,7 @@ import {
 } from "@/lib/ai/enhance-prompt";
 import { mapImageProviderError } from "@/lib/ai/provider-errors";
 import { isGrokConfigured } from "@/lib/xai/grok";
+import { isGrokImagineConfigured } from "@/lib/xai/imagine";
 import { isS3Configured, persistGeneratedImages } from "@/lib/alem/s3";
 import type { ProjectDetails } from "@/types";
 
@@ -18,6 +19,7 @@ export async function GET() {
     stability: !!process.env.STABILITY_API_KEY,
     qwen: !!process.env.QWEN_API_KEY,
     grok: isGrokConfigured(),
+    grokImagine: isGrokImagineConfigured(),
     imagePromptLlm: getImagePromptEnhancer(),
     s3: isS3Configured(),
   });
@@ -36,8 +38,9 @@ export async function POST(request: Request) {
 
     const hasLeonardo = !!process.env.LEONARDO_API_KEY;
     const hasStability = !!process.env.STABILITY_API_KEY;
+    const hasGrokImagine = isGrokImagineConfigured();
 
-    if (!hasLeonardo && !hasStability) {
+    if (!hasLeonardo && !hasStability && !hasGrokImagine) {
       return NextResponse.json(
         {
           error:
@@ -71,6 +74,7 @@ export async function POST(request: Request) {
       promptEnhanced: enhancer !== "none",
       promptEnhancedBy: enhancer !== "none" ? enhancer : undefined,
       fallbackFromLeonardo: result.fallbackFromLeonardo,
+      fallbackProvider: result.fallbackProvider,
       storedInS3: images.some((img) => img.includes("alem.ai")),
     });
   } catch (error) {

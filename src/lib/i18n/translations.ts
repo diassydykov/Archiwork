@@ -63,7 +63,9 @@ const ru = {
   generatingHint: "Полный комплект может занять 5–10 минут. Не закрывайте страницу.",
   generationError: "Не удалось сгенерировать изображение",
   leonardoNoTokens:
-    "Токены Leonardo.ai закончились. Пополните баланс на leonardo.ai или дождитесь обновления лимита. Если настроен Stability AI — генерация продолжится через него.",
+    "Токены Leonardo.ai закончились. Генерация продолжится через Grok Imagine или Stability AI (если ключи настроены). Пополните баланс на leonardo.ai.",
+  grokImagineFallback:
+    "Листы сгенерированы через Grok Imagine — токены Leonardo закончились. Один ключ xAI для текста и картинок.",
   stabilityFallback:
     "Часть листов сгенерирована через Stability AI (лимит Leonardo исчерпан). Единообразие листов может быть ниже.",
   noProviderConfigured: "AI не настроен. Добавьте ключи LEONARDO_API_KEY и STABILITY_API_KEY в Vercel → Settings → Environment Variables",
@@ -182,7 +184,9 @@ const kk: Record<TranslationKey, string> = {
   generatingHint: "Бұл бір минутқа дейін уақыт алуы мүмкін",
   generationError: "Сурет жасау сәтсіз аяқталды",
   leonardoNoTokens:
-    "Leonardo.ai токендері таусылды. leonardo.ai сайтында балансты толтырыңыз. Stability AI қосылған болса — сол арқылы жалғасады.",
+    "Leonardo.ai токендері таусылды. Grok Imagine немесе Stability AI арқылы жалғасады. leonardo.ai-да балансты толтырыңыз.",
+  grokImagineFallback:
+    "Парақтар Grok Imagine арқылы жасалды — Leonardo лимиті таусылды.",
   stabilityFallback:
     "Кейбір парақтар Stability AI арқылы жасалды (Leonardo лимиті таусылды). Біртұтастық төмен болуы мүмкін.",
   noProviderConfigured: "AI бапталмаған. Vercel → Environment Variables бөліміне LEONARDO_API_KEY және STABILITY_API_KEY қосыңыз",
@@ -301,7 +305,9 @@ const en: Record<TranslationKey, string> = {
   generatingHint: "This may take up to a minute",
   generationError: "Failed to generate image",
   leonardoNoTokens:
-    "Leonardo.ai API tokens exhausted. Top up at leonardo.ai or wait for your limit to reset. If Stability AI is configured, generation will continue via that provider.",
+    "Leonardo.ai tokens exhausted. Generation continues via Grok Imagine or Stability AI if configured. Top up at leonardo.ai.",
+  grokImagineFallback:
+    "Sheets generated via Grok Imagine — Leonardo limit reached. Same xAI key for text and images.",
   stabilityFallback:
     "Some sheets were generated via Stability AI (Leonardo limit reached). Cross-sheet consistency may be lower.",
   noProviderConfigured: "AI not configured. Add LEONARDO_API_KEY and STABILITY_API_KEY in Vercel → Settings → Environment Variables",
