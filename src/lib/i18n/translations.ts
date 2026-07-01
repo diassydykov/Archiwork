@@ -119,6 +119,11 @@ const ru = {
   mapScheme: "Схема",
   mapLoading: "Загрузка карты...",
   mapLoadError: "Не удалось загрузить карту",
+  mapBillingError:
+    "Google Maps: не включён биллинг. В Google Cloud Console привяжите платёжный аккаунт и включите Maps JavaScript API, Geocoding API и Maps Static API.",
+  mapCoordsManual:
+    "Или введите координаты участка вручную (можно скопировать из Google Maps):",
+  mapApplyCoords: "Применить координаты",
   mapNotConfigured: "Карта не настроена (нет API-ключа)",
   mapResolving: "Определяем адрес...",
   mapCoords: "Координаты",
@@ -242,6 +247,10 @@ const kk: Record<TranslationKey, string> = {
   mapScheme: "Схема",
   mapLoading: "Карта жүктелуде...",
   mapLoadError: "Картаны жүктеу сәтсіз",
+  mapBillingError:
+    "Google Maps: биллинг қосылмаған. Google Cloud Console-да төлем аккаунтын қосып, Maps JavaScript API қосыңыз.",
+  mapCoordsManual: "Немесе координаттарды қолмен енгізіңіз:",
+  mapApplyCoords: "Координаттарды қолдану",
   mapNotConfigured: "Карта бапталмаған",
   mapResolving: "Мекенжай анықталуда...",
   mapCoords: "Координаттар",
@@ -365,6 +374,10 @@ const en: Record<TranslationKey, string> = {
   mapScheme: "Map",
   mapLoading: "Loading map...",
   mapLoadError: "Failed to load map",
+  mapBillingError:
+    "Google Maps: billing not enabled. Link a billing account in Google Cloud Console and enable Maps JavaScript API, Geocoding API, and Maps Static API.",
+  mapCoordsManual: "Or enter site coordinates manually (copy from Google Maps):",
+  mapApplyCoords: "Apply coordinates",
   mapNotConfigured: "Map not configured (missing API key)",
   mapResolving: "Resolving address...",
   mapCoords: "Coordinates",
