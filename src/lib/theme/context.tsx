@@ -41,9 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!mounted) {
-    return (
-      <div style={{ visibility: "hidden" }}>{children}</div>
-    );
+    return <>{children}</>;
   }
 
   return (

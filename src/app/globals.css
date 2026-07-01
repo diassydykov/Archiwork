@@ -69,6 +69,19 @@ body {
   transition: background-color 0.2s, color 0.2s;
 }
 
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+input,
+textarea {
+  pointer-events: auto;
+}
+
 [data-theme="accessible"] *:focus-visible {
   outline: 3px solid #0000cc !important;
   outline-offset: 2px;

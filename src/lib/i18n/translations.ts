@@ -66,6 +66,16 @@ const ru = {
   yourVisualization: "Ваша визуализация",
   newProject: "Новый проект",
   poweredBy: "Сгенерировано через",
+  assistantTitle: "Архитектурный ассистент",
+  assistantGreeting:
+    "Здравствуйте! Расскажите, какой дом или здание вы хотите — помогу составить описание для проекта.",
+  assistantPlaceholder: "Например: двухэтажный дом 200 м², современный стиль...",
+  assistantSend: "Отправить",
+  assistantInsert: "Вставить в описание",
+  assistantClose: "Закрыть",
+  assistantOpen: "Открыть ассистента",
+  assistantThinking: "Думаю...",
+  assistantError: "Ассистент временно недоступен",
 };
 
 const kk: Record<TranslationKey, string> = {
@@ -132,6 +142,16 @@ const kk: Record<TranslationKey, string> = {
   yourVisualization: "Сіздің визуализацияңыз",
   newProject: "Жаңа жоба",
   poweredBy: "Генерация",
+  assistantTitle: "Сәулет көмекшісі",
+  assistantGreeting:
+    "Сәлеметсіз бе! Қандай үй немесе ғимарат қалайтыныңызды айтыңыз — жоба сипаттамасын жазуға көмектесемін.",
+  assistantPlaceholder: "Мысалы: 2 қабатты үй 200 м², заманауи стиль...",
+  assistantSend: "Жіберу",
+  assistantInsert: "Сипаттамаға қою",
+  assistantClose: "Жабу",
+  assistantOpen: "Көмекшіні ашу",
+  assistantThinking: "Ойлануда...",
+  assistantError: "Көмекші уақытша қолжетімсіз",
 };
 
 const en: Record<TranslationKey, string> = {
@@ -198,6 +218,16 @@ const en: Record<TranslationKey, string> = {
   yourVisualization: "Your visualization",
   newProject: "New project",
   poweredBy: "Generated via",
+  assistantTitle: "Architectural assistant",
+  assistantGreeting:
+    "Hello! Tell me what kind of house or building you want — I'll help you write the project description.",
+  assistantPlaceholder: "e.g. two-story house 200 m², modern style...",
+  assistantSend: "Send",
+  assistantInsert: "Insert into description",
+  assistantClose: "Close",
+  assistantOpen: "Open assistant",
+  assistantThinking: "Thinking...",
+  assistantError: "Assistant is temporarily unavailable",
 };
 
 export const translations: Record<Locale, Record<TranslationKey, string>> = {

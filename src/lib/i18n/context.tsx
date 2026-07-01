@@ -22,14 +22,12 @@ const LOCALE_KEY = "archiwork-locale";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("ru");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(LOCALE_KEY) as Locale | null;
     if (saved && ["kk", "ru", "en"].includes(saved)) {
       setLocaleState(saved);
     }
-    setMounted(true);
   }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
@@ -41,10 +39,6 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     (key: TranslationKey) => translate(locale, key),
     [locale]
   );
-
-  if (!mounted) {
-    return null;
-  }
 
   return (
     <I18nContext.Provider value={{ locale, setLocale, t }}>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { useAssistant } from "@/lib/assistant/context";
 import { Input } from "./ui/Input";
 import { Textarea } from "./ui/Textarea";
 import { Button } from "./ui/Button";
@@ -19,6 +20,7 @@ export function ProjectDetailsForm({
   onBack,
 }: ProjectDetailsFormProps) {
   const { t } = useI18n();
+  const { setBuildingType, registerInsertHandler } = useAssistant();
 
   const [description, setDescription] = useState("");
   const [area, setArea] = useState("");
@@ -29,6 +31,13 @@ export function ProjectDetailsForm({
   const [wishes, setWishes] = useState("");
   const [additional, setAdditional] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setBuildingType(buildingType);
+    return registerInsertHandler((text) => {
+      setDescription((prev) => (prev ? `${prev}\n\n${text}` : text));
+    });
+  }, [buildingType, setBuildingType, registerInsertHandler]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

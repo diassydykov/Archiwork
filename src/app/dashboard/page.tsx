@@ -10,6 +10,7 @@ import { ProjectDetailsForm } from "@/components/ProjectDetailsForm";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
 import { useI18n } from "@/lib/i18n/context";
+import { useAssistant } from "@/lib/assistant/context";
 import type { BuildingType, ProjectDetails } from "@/types";
 
 type Step = "type" | "details";
@@ -25,12 +26,14 @@ export default function DashboardPage() {
 function DashboardContent() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { setBuildingType: setAssistantBuildingType } = useAssistant();
   const router = useRouter();
   const [step, setStep] = useState<Step>("type");
   const [buildingType, setBuildingType] = useState<BuildingType | null>(null);
 
   const handleContinue = () => {
     if (!buildingType) return;
+    setAssistantBuildingType(buildingType);
     setStep("details");
   };
 
