@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
+import { generateImageFromPrompt } from "@/lib/ai/generate-image";
 import {
   enhanceArchitecturalPrompt,
   getImagePromptEnhancer,
 } from "@/lib/ai/enhance-prompt";
+import { mapImageProviderError } from "@/lib/ai/provider-errors";
 import { isGrokConfigured } from "@/lib/xai/grok";
 import { isS3Configured, persistGeneratedImages } from "@/lib/alem/s3";
-import { generateWithLeonardo } from "@/lib/leonardo/client";
-import { generateWithStability } from "@/lib/stability/client";
 import type { ProjectDetails } from "@/types";
 
 // Генерация может занимать до 60+ секунд (Leonardo polling)
@@ -49,32 +49,14 @@ export async function POST(request: Request) {
 
     const prompt = await enhanceArchitecturalPrompt(project);
 
-    let result: { prompt: string; provider: string; images: string[] };
-    const errors: string[] = [];
+    const result = await generateImageFromPrompt(prompt, "16:9", {
+      preferLeonardo: hasLeonardo,
+    });
 
-    // Stability быстрее — пробуем первым (важно для лимита Vercel ~10–60 сек)
-    if (hasStability) {
-      try {
-        result = await generateWithStability(project, prompt);
-      } catch (stabilityError) {
-        const msg =
-          stabilityError instanceof Error
-            ? stabilityError.message
-            : "Stability failed";
-        errors.push(msg);
-        console.error("Stability failed:", stabilityError);
-
-        if (!hasLeonardo) throw stabilityError;
-        result = await generateWithLeonardo(project, prompt);
-      }
-    } else {
-      result = await generateWithLeonardo(project, prompt);
-    }
-
-    let images = result.images;
+    let images = [result.image];
     if (isS3Configured()) {
       try {
-        images = await persistGeneratedImages(result.images);
+        images = await persistGeneratedImages(images);
       } catch (s3Error) {
         console.error("S3 persist failed, using original URLs:", s3Error);
       }
@@ -83,17 +65,23 @@ export async function POST(request: Request) {
     const enhancer = getImagePromptEnhancer();
 
     return NextResponse.json({
-      ...result,
+      prompt: result.prompt,
+      provider: result.provider,
       images,
       promptEnhanced: enhancer !== "none",
       promptEnhancedBy: enhancer !== "none" ? enhancer : undefined,
+      fallbackFromLeonardo: result.fallbackFromLeonardo,
       storedInS3: images.some((img) => img.includes("alem.ai")),
-      warnings: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
+    const mapped = mapImageProviderError(error);
     const message =
-      error instanceof Error ? error.message : "Generation failed";
+      mapped?.message ??
+      (error instanceof Error ? error.message : "Generation failed");
     console.error("Generation error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, errorCode: mapped?.code },
+      { status: mapped?.code === "LEONARDO_NO_TOKENS" ? 402 : 500 }
+    );
   }
 }

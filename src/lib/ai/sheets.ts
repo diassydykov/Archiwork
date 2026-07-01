@@ -134,54 +134,65 @@ function projectContext(project: ProjectDetails): string {
 
 const sheetPrompts: Record<SheetId, string> = {
   site_plan:
-    "Site plan / master plan of entire land plot, top view, showing building footprint, driveway, parking, pool, terrace, garden, trees, boundaries, north arrow, dimension lines in meters, scale 1:500, architectural blueprint",
+    "Site master plan top view of THE SAME building from design lock, building footprint on plot, driveway, parking, landscaping, north arrow, scale 1:500, unlabeled schematic blueprint",
   floor_1:
-    "Architectural floor plan FIRST FLOOR only, top view, walls, doors, windows, room labels with names and areas in sqm, dimension chains in meters, staircase, furniture layout hints, scale 1:100, black lines on white, technical CAD drawing",
+    "First floor plan top view of THE SAME building, walls doors windows staircase, unlabeled room rectangles, furniture outlines only, scale 1:100, pure black lines on white, NO text",
   floor_2:
-    "Architectural floor plan SECOND FLOOR only, top view, bedrooms, bathrooms, balconies, dimension lines in meters, room labels, scale 1:100, black lines on white, technical CAD blueprint",
+    "Second floor plan top view of THE SAME building, bedrooms bathrooms balconies, unlabeled room rectangles, scale 1:100, pure black lines on white, NO text",
   floor_3:
-    "Architectural floor plan THIRD FLOOR only, top view, dimension lines, room labels, scale 1:100, technical CAD blueprint",
+    "Third floor plan top view of THE SAME building, unlabeled room rectangles, scale 1:100, pure black lines on white, NO text",
   front_elevation:
-    "Front elevation architectural drawing, facade view, height dimensions in meters, floor levels marked, window and door openings, materials notation, scale 1:100, technical blueprint black lines on white",
+    "Front elevation of THE SAME building, main facade facing viewer, window and door openings, materials, scale 1:100, technical blueprint black lines on white, NO text",
   side_elevation:
-    "Side elevation architectural drawing, left side facade, height dimensions, floor levels, roof slope, scale 1:100, technical blueprint",
+    "Left side elevation of THE SAME building, height levels, roof profile, scale 1:100, technical blueprint, NO text",
   rear_elevation:
-    "Rear elevation architectural drawing, back facade view, terrace, windows, height dimensions in meters, scale 1:100, technical blueprint",
+    "Rear elevation of THE SAME building, back facade terrace windows, scale 1:100, technical blueprint, NO text",
   roof_plan:
-    "Roof plan top view, showing roof outline, slopes, drainage, chimneys, skylights, dimensions in meters, architectural blueprint",
+    "Roof plan top view of THE SAME building, roof outline slopes drainage, scale 1:100, schematic blueprint, NO text",
   section:
-    "Building cross-section A-A, cut through building showing floor heights, foundation, roof structure, room heights in meters, insulation layers, scale 1:100, technical architectural section drawing",
+    "Building cross-section A-A of THE SAME building, cut through showing floors foundation roof structure, scale 1:100, technical section drawing, NO text",
   perspective:
-    "Photorealistic 3D architectural exterior visualization, professional render, golden hour lighting, landscaping, high detail",
+    "Photorealistic 3D exterior of THE SAME building, professional architectural render, golden hour, landscaping, consistent with design lock",
 };
 
 export function buildSheetPrompt(
   project: ProjectDetails,
   sheet: SheetDefinition,
-  specSummary?: string,
-  maxLength = LEONARDO_PROMPT_MAX_LENGTH
+  options?: {
+    specSummary?: string;
+    designLock?: string;
+    maxLength?: number;
+  }
 ): string {
+  const specSummary = options?.specSummary;
+  const designLock = options?.designLock;
+  const maxLength = options?.maxLength ?? LEONARDO_PROMPT_MAX_LENGTH;
+
   const base = sheetPrompts[sheet.id];
   const blueprintSuffix =
-    " Include dimension lines, annotations, scale bar. Black ink on white background. No watercolor, no photorealistic rendering. CAD documentation style.";
+    " Pure schematic line art. NO text, NO labels, NO letters, NO numbers, NO annotations, NO handwriting. Black ink on white background. CAD documentation style. Same building as all other sheets.";
+
+  const lockPrefix = designLock
+    ? `ONE PROJECT — design lock (must match exactly): ${truncatePrompt(designLock, 400)}. `
+    : "";
 
   const header = sheet.blueprint
-    ? `Professional architectural technical drawing. ${base}.`
-    : `Professional architectural visualization. ${base}.`;
-  const footer = sheet.blueprint ? blueprintSuffix : "";
+    ? `${lockPrefix}Professional architectural technical drawing. ${base}.`
+    : `${lockPrefix}Professional architectural visualization. ${base}.`;
+  const footer = sheet.blueprint ? blueprintSuffix : " Same building as design lock.";
 
   const overhead = header.length + footer.length + 32;
   const available = Math.max(0, maxLength - overhead);
   const ctxBudget = specSummary
-    ? Math.min(500, Math.floor(available * 0.45))
+    ? Math.min(300, Math.floor(available * 0.4))
     : available;
   const specBudget = specSummary ? available - ctxBudget : 0;
 
   const ctx = truncatePrompt(projectContext(project), ctxBudget);
-  let prompt = `${header} Project: ${ctx}.`;
+  let prompt = `${header} Client brief: ${ctx}.`;
 
   if (specSummary && specBudget > 0) {
-    prompt += ` Design brief: ${truncatePrompt(specSummary, specBudget)}.`;
+    prompt += ` Spec excerpt: ${truncatePrompt(specSummary, specBudget)}.`;
   }
 
   prompt += footer;

@@ -62,6 +62,10 @@ const ru = {
   generating: "Генерируем визуализацию...",
   generatingHint: "Полный комплект может занять 5–10 минут. Не закрывайте страницу.",
   generationError: "Не удалось сгенерировать изображение",
+  leonardoNoTokens:
+    "Токены Leonardo.ai закончились. Пополните баланс на leonardo.ai или дождитесь обновления лимита. Если настроен Stability AI — генерация продолжится через него.",
+  stabilityFallback:
+    "Часть листов сгенерирована через Stability AI (лимит Leonardo исчерпан). Единообразие листов может быть ниже.",
   noProviderConfigured: "AI не настроен. Добавьте ключи LEONARDO_API_KEY и STABILITY_API_KEY в Vercel → Settings → Environment Variables",
   retry: "Попробовать снова",
   yourVisualization: "Ваша визуализация",
@@ -95,7 +99,8 @@ const ru = {
   sheetSection: "Разрез здания",
   sheetPerspective: "3D визуализация",
   disclaimerBlueprint:
-    "Эскизный проект сгенерирован ИИ. Размеры ориентировочные — для строительства требуется рабочая документация архитектора.",
+    "Эскизный проект сгенерирован ИИ. Все листы — одно здание по единому описанию. Подписи на чертежах схематичные (ИИ не рисует текст). Для строительства нужна рабочая документация архитектора.",
+  designLockTitle: "Единая концепция здания",
   downloadPdf: "Скачать PDF",
   printSheet: "Печать",
   printAll: "Печать всех листов",
@@ -176,6 +181,10 @@ const kk: Record<TranslationKey, string> = {
   generating: "Визуализация жасалуда...",
   generatingHint: "Бұл бір минутқа дейін уақыт алуы мүмкін",
   generationError: "Сурет жасау сәтсіз аяқталды",
+  leonardoNoTokens:
+    "Leonardo.ai токендері таусылды. leonardo.ai сайтында балансты толтырыңыз. Stability AI қосылған болса — сол арқылы жалғасады.",
+  stabilityFallback:
+    "Кейбір парақтар Stability AI арқылы жасалды (Leonardo лимиті таусылды). Біртұтастық төмен болуы мүмкін.",
   noProviderConfigured: "AI бапталмаған. Vercel → Environment Variables бөліміне LEONARDO_API_KEY және STABILITY_API_KEY қосыңыз",
   retry: "Қайта көру",
   yourVisualization: "Сіздің визуализацияңыз",
@@ -209,7 +218,8 @@ const kk: Record<TranslationKey, string> = {
   sheetSection: "Ғимарат кесіндісі",
   sheetPerspective: "3D визуализация",
   disclaimerBlueprint:
-    "Эскиздік жоба ИИ арқылы жасалған. Өлшемдер шамамен — құрылыс үшін сәулетшінің жұмыс жобасы қажет.",
+    "Эскиздік жоба ИИ арқылы жасалған. Барлық парақтар — бір ғимарат. Жазулар схематикалық. Құрылыс үшін сәулетшінің жұмыс жобасы қажет.",
+  designLockTitle: "Біртұтас ғимарат концепциясы",
   downloadPdf: "PDF жүктеу",
   printSheet: "Басып шығару",
   printAll: "Барлық парақты басып шығару",
@@ -290,6 +300,10 @@ const en: Record<TranslationKey, string> = {
   generating: "Generating visualization...",
   generatingHint: "This may take up to a minute",
   generationError: "Failed to generate image",
+  leonardoNoTokens:
+    "Leonardo.ai API tokens exhausted. Top up at leonardo.ai or wait for your limit to reset. If Stability AI is configured, generation will continue via that provider.",
+  stabilityFallback:
+    "Some sheets were generated via Stability AI (Leonardo limit reached). Cross-sheet consistency may be lower.",
   noProviderConfigured: "AI not configured. Add LEONARDO_API_KEY and STABILITY_API_KEY in Vercel → Settings → Environment Variables",
   retry: "Try again",
   yourVisualization: "Your visualization",
@@ -323,7 +337,8 @@ const en: Record<TranslationKey, string> = {
   sheetSection: "Building section",
   sheetPerspective: "3D visualization",
   disclaimerBlueprint:
-    "AI-generated sketch design. Dimensions are approximate — working drawings by a licensed architect required for construction.",
+    "AI-generated sketch design. All sheets depict one building. Labels on drawings are schematic (AI cannot render text). Licensed architect required for construction documents.",
+  designLockTitle: "Unified building concept",
   downloadPdf: "Download PDF",
   printSheet: "Print",
   printAll: "Print all sheets",

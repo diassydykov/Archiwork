@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/context";
 import { getProjectSheets } from "@/lib/ai/sheets";
 import type { SheetTitleKey } from "@/lib/ai/sheets";
+import { getSheetGenerationOrder, sortSheetsForDisplay } from "@/lib/ai/sheet-order";
 import {
   downloadAllSheetsPdf,
   downloadSheetPdf,
@@ -40,7 +41,9 @@ function ResultContent() {
   const [sheetProgress, setSheetProgress] = useState({ current: 0, total: 0 });
   const [currentSheetTitle, setCurrentSheetTitle] = useState("");
   const [error, setError] = useState("");
+  const [designLock, setDesignLock] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [stabilityFallback, setStabilityFallback] = useState(false);
 
   const projectTitle =
     project?.buildingType === "residential"
@@ -49,15 +52,21 @@ function ResultContent() {
 
   const pdfFooter = t("pdfFooter");
 
+  const displaySheets = project
+    ? sortSheetsForDisplay(sheets, getProjectSheets(project))
+    : sheets;
+
   const generatePackage = useCallback(
     async (projectData: ProjectDetails) => {
       setLoading(true);
       setError("");
       setSpecification("");
       setSheets([]);
+      setDesignLock("");
+      setStabilityFallback(false);
       setPhase("spec");
 
-      const sheetDefs = getProjectSheets(projectData);
+      const sheetDefs = getSheetGenerationOrder(getProjectSheets(projectData));
       setSheetProgress({ current: 0, total: sheetDefs.length });
 
       try {
@@ -71,10 +80,23 @@ function ResultContent() {
 
         const spec = specData.specification as string;
         setSpecification(spec);
+
+        const lockRes = await fetch("/api/project/design-lock", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ project: projectData, specification: spec }),
+        });
+        const lockData = await lockRes.json();
+        const lock = lockRes.ok
+          ? (lockData.designLock as string)
+          : "";
+        setDesignLock(lock);
+
         setPhase("sheets");
 
         const specSummary = spec.slice(0, 600);
         const results: ProjectSheetResult[] = [];
+        let referenceImageId: string | undefined;
 
         for (let i = 0; i < sheetDefs.length; i++) {
           const sheet = sheetDefs[i];
@@ -89,11 +111,27 @@ function ResultContent() {
                 project: projectData,
                 sheet,
                 specSummary,
+                designLock: lock,
+                referenceImageId,
               }),
             });
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error);
+            if (!res.ok) {
+              throw new Error(
+                data.errorCode === "LEONARDO_NO_TOKENS"
+                  ? t("leonardoNoTokens")
+                  : data.error || t("generationError")
+              );
+            }
+
+            if (data.fallbackFromLeonardo) {
+              setStabilityFallback(true);
+            }
+
+            if (data.referenceImageId) {
+              referenceImageId = data.referenceImageId as string;
+            }
 
             results.push({
               id: sheet.id,
@@ -119,7 +157,7 @@ function ResultContent() {
         setPhase("done");
         sessionStorage.setItem(
           "archiwork-project-result",
-          JSON.stringify({ specification: spec, sheets: results })
+          JSON.stringify({ specification: spec, designLock: lock, sheets: results })
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : t("generationError"));
@@ -146,6 +184,7 @@ function ResultContent() {
         const data = JSON.parse(cached);
         if (data.specification && data.sheets?.length) {
           setSpecification(data.specification);
+          if (data.designLock) setDesignLock(data.designLock);
           setSheets(data.sheets);
           setPhase("done");
           return;
@@ -340,6 +379,30 @@ function ResultContent() {
             </section>
           )}
 
+          {designLock && (
+            <section
+              className="animate-fade-in rounded-2xl p-6 sm:p-8"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border)",
+                boxShadow: "var(--shadow)",
+              }}
+            >
+              <h2
+                className="mb-3 text-lg font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {t("designLockTitle")}
+              </h2>
+              <p
+                className="text-sm leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {designLock}
+              </p>
+            </section>
+          )}
+
           {sheets.length > 0 && (
             <section className="animate-slide-up">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -363,8 +426,20 @@ function ResultContent() {
                   </div>
                 )}
               </div>
+              {stabilityFallback && (
+                <p
+                  className="mb-4 rounded-xl px-4 py-3 text-sm"
+                  style={{
+                    backgroundColor: "var(--bg-accent)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  {t("stabilityFallback")}
+                </p>
+              )}
               <div className="grid gap-6 sm:grid-cols-2">
-                {sheets.map((sheet) => (
+                {displaySheets.map((sheet) => (
                   <SheetCard
                     key={sheet.id}
                     sheet={sheet}

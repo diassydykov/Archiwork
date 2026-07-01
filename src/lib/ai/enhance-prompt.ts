@@ -28,14 +28,16 @@ function systemPromptForMode(mode: ImagePromptMode, maxLength: number): string {
 
   if (mode === "blueprint") {
     return `You are an expert prompt engineer for Leonardo AI architectural blueprint generation.
-Improve the prompt for clear technical drawings: floor plans, elevations, sections, site plans.
-Keep: drawing type, scale, dimension lines, black ink on white, CAD/blueprint style.
+Improve the prompt for clear technical drawings of ONE consistent building.
+CRITICAL: Keep "design lock" text verbatim. Never add text labels, room names, numbers, or annotations.
+Style: unlabeled schematic CAD, black lines on white, no lettering.
 Output ONLY the final English prompt, no quotes or explanations.
 STRICT LIMIT: ${limit} characters maximum.`;
   }
 
   return `You are an expert prompt engineer for Leonardo AI architectural visualization.
-Improve the prompt for photorealistic exterior renders and 3D perspectives.
+Improve the prompt for photorealistic exterior of ONE consistent building.
+CRITICAL: Keep "design lock" text verbatim. Same building across all views.
 Output ONLY the final English prompt, no quotes or explanations.
 STRICT LIMIT: ${limit} characters maximum.`;
 }
