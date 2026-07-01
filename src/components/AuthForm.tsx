@@ -65,7 +65,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     >
       <div className="mb-8 text-center">
         <div className="mb-6 flex justify-center">
-          <Logo size={80} />
+          <Logo size={96} />
         </div>
         <h1
           className="text-2xl font-semibold tracking-tight"
