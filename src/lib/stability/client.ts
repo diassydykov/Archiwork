@@ -13,13 +13,14 @@ function getApiKey(): string {
 
 export async function generateWithStability(
   project: ProjectDetails,
-  prompt?: string
+  prompt?: string,
+  aspectRatio: "16:9" | "1:1" | "4:5" = "16:9"
 ) {
   const finalPrompt = prompt ?? buildArchitecturalPrompt(project);
 
   const form = new FormData();
   form.append("prompt", finalPrompt);
-  form.append("aspect_ratio", "16:9");
+  form.append("aspect_ratio", aspectRatio);
   form.append("output_format", "png");
 
   const res = await fetch(STABILITY_API, {

@@ -1,5 +1,4 @@
-"use client";
-
+import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { useAssistant } from "@/lib/assistant/context";
@@ -7,6 +6,19 @@ import { Input } from "./ui/Input";
 import { Textarea } from "./ui/Textarea";
 import { Button } from "./ui/Button";
 import type { BuildingType, ProjectDetails } from "@/types";
+
+const SiteMapPicker = dynamic(
+  () => import("./SiteMapPicker").then((m) => m.SiteMapPicker),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex h-80 items-center justify-center rounded-xl"
+        style={{ backgroundColor: "var(--bg-accent)" }}
+      />
+    ),
+  }
+);
 
 interface ProjectDetailsFormProps {
   buildingType: BuildingType;
@@ -30,6 +42,8 @@ export function ProjectDetailsForm({
   const [location, setLocation] = useState("");
   const [wishes, setWishes] = useState("");
   const [additional, setAdditional] = useState("");
+  const [latitude, setLatitude] = useState<number | undefined>();
+  const [longitude, setLongitude] = useState<number | undefined>();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -55,6 +69,8 @@ export function ProjectDetailsForm({
       location,
       wishes,
       additional,
+      latitude,
+      longitude,
     });
   };
 
@@ -76,6 +92,16 @@ export function ProjectDetailsForm({
           {t("projectDetailsDesc")}
         </p>
       </div>
+
+      <SiteMapPicker
+        latitude={latitude}
+        longitude={longitude}
+        onLocationChange={({ latitude: lat, longitude: lng, address }) => {
+          setLatitude(lat);
+          setLongitude(lng);
+          if (address) setLocation(address);
+        }}
+      />
 
       <Textarea
         label={`${t("description")} *`}
@@ -150,7 +176,12 @@ export function ProjectDetailsForm({
         <Button type="button" variant="ghost" onClick={onBack}>
           {t("back")}
         </Button>
-        <Button type="submit">{t("generate")}</Button>
+        <div className="flex flex-col gap-1 sm:items-end">
+          <Button type="submit">{t("generate")}</Button>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {t("generateHint")}
+          </p>
+        </div>
       </div>
     </form>
   );

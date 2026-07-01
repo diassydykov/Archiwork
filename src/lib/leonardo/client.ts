@@ -51,21 +51,24 @@ async function waitForGeneration(generationId: string, maxAttempts = 30) {
 
 export async function generateWithLeonardo(
   project: ProjectDetails,
-  prompt?: string
+  prompt?: string,
+  size?: { width: number; height: number }
 ) {
   if (!getApiKey()) {
     throw new Error("LEONARDO_API_KEY is not configured");
   }
 
   const finalPrompt = prompt ?? buildArchitecturalPrompt(project);
+  const width = size?.width ?? 1024;
+  const height = size?.height ?? 768;
 
   const createData = await leonardoFetch("/generations", {
     method: "POST",
     body: JSON.stringify({
       modelId: PHOENIX_MODEL_ID,
       prompt: finalPrompt,
-      width: 1024,
-      height: 768,
+      width,
+      height,
       num_images: 1,
       alchemy: true,
       contrast: 3.5,

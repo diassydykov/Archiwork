@@ -20,4 +20,19 @@ export interface ProjectDetails {
   location: string;
   wishes: string;
   additional: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface ProjectSheetResult {
+  id: string;
+  titleKey: string;
+  image: string;
+  provider?: string;
+  error?: string;
+}
+
+export interface ArchitecturalProjectResult {
+  specification: string;
+  sheets: ProjectSheetResult[];
 }

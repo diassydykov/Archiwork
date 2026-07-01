@@ -43,6 +43,7 @@ function DashboardContent() {
       ...details,
     };
     sessionStorage.setItem("archiwork-current-project", JSON.stringify(project));
+    sessionStorage.removeItem("archiwork-project-result");
     router.push("/project/result");
   };
 

@@ -13,6 +13,9 @@ export function buildArchitecturalPrompt(project: ProjectDetails): string {
     project.area && `Total area: ${project.area} sqm`,
     project.floors && `Floors: ${project.floors}`,
     project.location && `Location: ${project.location}`,
+    project.latitude != null &&
+      project.longitude != null &&
+      `Site GPS: ${project.latitude}, ${project.longitude}`,
     project.wishes && `Client requirements: ${project.wishes}`,
     project.additional,
     "Golden hour lighting, clean composition, high detail, 8k architectural photography",
