@@ -73,7 +73,7 @@ function ResultContent() {
         setSpecification(spec);
         setPhase("sheets");
 
-        const specSummary = spec.slice(0, 1500);
+        const specSummary = spec.slice(0, 600);
         const results: ProjectSheetResult[] = [];
 
         for (let i = 0; i < sheetDefs.length; i++) {

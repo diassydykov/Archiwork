@@ -1,5 +1,6 @@
 import type { ProjectDetails } from "@/types";
 import { buildArchitecturalPrompt } from "@/lib/ai/prompt";
+import { LEONARDO_PROMPT_MAX_LENGTH, truncatePrompt } from "@/lib/ai/prompt-limit";
 
 const LEONARDO_API = "https://cloud.leonardo.ai/api/rest/v1";
 const PHOENIX_MODEL_ID = "de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3";
@@ -58,7 +59,10 @@ export async function generateWithLeonardo(
     throw new Error("LEONARDO_API_KEY is not configured");
   }
 
-  const finalPrompt = prompt ?? buildArchitecturalPrompt(project);
+  const finalPrompt = truncatePrompt(
+    prompt ?? buildArchitecturalPrompt(project),
+    LEONARDO_PROMPT_MAX_LENGTH
+  );
   const width = size?.width ?? 1024;
   const height = size?.height ?? 768;
 

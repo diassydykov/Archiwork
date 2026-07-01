@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildSheetPrompt } from "@/lib/ai/sheets";
+import { enhanceImagePrompt } from "@/lib/ai/enhance-prompt";
 import { generateImageFromPrompt } from "@/lib/ai/generate-image";
 import { persistGeneratedImages } from "@/lib/alem/s3";
 import type { SheetDefinition } from "@/lib/ai/sheets";
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const prompt = buildSheetPrompt(project, sheet, specSummary);
+    const basePrompt = buildSheetPrompt(project, sheet, specSummary);
+    const { prompt, enhancer } = await enhanceImagePrompt(basePrompt, {
+      mode: sheet.blueprint ? "blueprint" : "visualization",
+    });
     const result = await generateImageFromPrompt(prompt, sheet.aspectRatio);
 
     let image = result.image;
@@ -29,6 +33,7 @@ export async function POST(request: Request) {
       sheetId: sheet.id,
       image,
       provider: result.provider,
+      promptEnhancedBy: enhancer !== "none" ? enhancer : undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sheet failed";

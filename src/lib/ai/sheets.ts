@@ -1,4 +1,5 @@
 import type { ProjectDetails } from "@/types";
+import { LEONARDO_PROMPT_MAX_LENGTH, truncatePrompt } from "@/lib/ai/prompt-limit";
 
 export type SheetId =
   | "site_plan"
@@ -157,14 +158,32 @@ const sheetPrompts: Record<SheetId, string> = {
 export function buildSheetPrompt(
   project: ProjectDetails,
   sheet: SheetDefinition,
-  specSummary?: string
+  specSummary?: string,
+  maxLength = LEONARDO_PROMPT_MAX_LENGTH
 ): string {
-  const ctx = projectContext(project);
   const base = sheetPrompts[sheet.id];
+  const blueprintSuffix =
+    " Include dimension lines, annotations, scale bar. Black ink on white background. No watercolor, no photorealistic rendering. CAD documentation style.";
 
-  if (sheet.blueprint) {
-    return `Professional architectural technical drawing. ${base}. Project: ${ctx}. ${specSummary ? `Design brief: ${specSummary}` : ""} Include dimension lines, annotations, scale bar. Black ink on white background. No watercolor, no photorealistic rendering. CAD documentation style.`;
+  const header = sheet.blueprint
+    ? `Professional architectural technical drawing. ${base}.`
+    : `Professional architectural visualization. ${base}.`;
+  const footer = sheet.blueprint ? blueprintSuffix : "";
+
+  const overhead = header.length + footer.length + 32;
+  const available = Math.max(0, maxLength - overhead);
+  const ctxBudget = specSummary
+    ? Math.min(500, Math.floor(available * 0.45))
+    : available;
+  const specBudget = specSummary ? available - ctxBudget : 0;
+
+  const ctx = truncatePrompt(projectContext(project), ctxBudget);
+  let prompt = `${header} Project: ${ctx}.`;
+
+  if (specSummary && specBudget > 0) {
+    prompt += ` Design brief: ${truncatePrompt(specSummary, specBudget)}.`;
   }
 
-  return `Professional architectural visualization. ${base}. Project: ${ctx}. ${specSummary ?? ""}`;
+  prompt += footer;
+  return truncatePrompt(prompt, maxLength);
 }

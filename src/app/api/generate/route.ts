@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { enhanceArchitecturalPrompt } from "@/lib/alem/qwen";
+import {
+  enhanceArchitecturalPrompt,
+  getImagePromptEnhancer,
+} from "@/lib/ai/enhance-prompt";
+import { isGrokConfigured } from "@/lib/xai/grok";
 import { isS3Configured, persistGeneratedImages } from "@/lib/alem/s3";
 import { generateWithLeonardo } from "@/lib/leonardo/client";
 import { generateWithStability } from "@/lib/stability/client";
@@ -13,6 +17,8 @@ export async function GET() {
     leonardo: !!process.env.LEONARDO_API_KEY,
     stability: !!process.env.STABILITY_API_KEY,
     qwen: !!process.env.QWEN_API_KEY,
+    grok: isGrokConfigured(),
+    imagePromptLlm: getImagePromptEnhancer(),
     s3: isS3Configured(),
   });
 }
@@ -74,10 +80,13 @@ export async function POST(request: Request) {
       }
     }
 
+    const enhancer = getImagePromptEnhancer();
+
     return NextResponse.json({
       ...result,
       images,
-      promptEnhanced: !!process.env.QWEN_API_KEY,
+      promptEnhanced: enhancer !== "none",
+      promptEnhancedBy: enhancer !== "none" ? enhancer : undefined,
       storedInS3: images.some((img) => img.includes("alem.ai")),
       warnings: errors.length > 0 ? errors : undefined,
     });
