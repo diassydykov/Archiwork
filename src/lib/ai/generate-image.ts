@@ -6,18 +6,26 @@ import {
 } from "@/lib/xai/imagine";
 import {
   ImageProviderError,
+  isContentModerationBlocked,
   isLeonardoTokensExhausted,
 } from "@/lib/ai/provider-errors";
+import { sanitizeImagePrompt } from "@/lib/ai/sanitize-prompt";
 import type { ProjectDetails } from "@/types";
 
 export interface GenerateImageOptions {
   referenceImageId?: string;
   blueprint?: boolean;
-  /** When true, try Leonardo first (for style reference chain). */
   preferLeonardo?: boolean;
 }
 
 export type ImageFallbackProvider = "grok-imagine" | "stability";
+
+type ProviderResult = {
+  image: string;
+  provider: string;
+  prompt: string;
+  referenceImageId?: string;
+};
 
 export async function generateImageFromPrompt(
   prompt: string,
@@ -30,6 +38,7 @@ export async function generateImageFromPrompt(
   referenceImageId?: string;
   fallbackFromLeonardo?: boolean;
   fallbackProvider?: ImageFallbackProvider;
+  usedSafePrompt?: boolean;
 }> {
   const stubProject: ProjectDetails = {
     buildingType: "residential",
@@ -58,8 +67,8 @@ export async function generateImageFromPrompt(
         ? { width: 832, height: 1024 }
         : { width: 1024, height: 768 };
 
-  async function runGrokImagine() {
-    const result = await generateWithGrokImagine(prompt, aspectRatio, {
+  async function runGrokImagine(safePrompt: string) {
+    const result = await generateWithGrokImagine(safePrompt, aspectRatio, {
       blueprint: options?.blueprint,
     });
     return {
@@ -69,10 +78,10 @@ export async function generateImageFromPrompt(
     };
   }
 
-  async function runStability() {
+  async function runStability(safePrompt: string) {
     const result = await generateWithStability(
       stubProject,
-      prompt,
+      safePrompt,
       aspectRatio
     );
     return {
@@ -82,8 +91,8 @@ export async function generateImageFromPrompt(
     };
   }
 
-  async function runLeonardo() {
-    const result = await generateWithLeonardo(stubProject, prompt, {
+  async function runLeonardo(safePrompt: string) {
+    const result = await generateWithLeonardo(stubProject, safePrompt, {
       ...leonardoSize,
       referenceImageId: options?.referenceImageId,
       blueprint: options?.blueprint,
@@ -97,46 +106,99 @@ export async function generateImageFromPrompt(
     };
   }
 
+  async function withModerationRetry(
+    run: (safePrompt: string) => Promise<ProviderResult>
+  ): Promise<{ result: ProviderResult; usedSafePrompt: boolean }> {
+    try {
+      const result = await run(prompt);
+      return { result, usedSafePrompt: false };
+    } catch (error) {
+      if (!isContentModerationBlocked(error)) throw error;
+
+      const safePrompt = await sanitizeImagePrompt(prompt, options?.blueprint);
+      console.warn("Content moderation blocked — retrying with safe prompt");
+
+      try {
+        const result = await run(safePrompt);
+        return { result, usedSafePrompt: true };
+      } catch (retryError) {
+        if (isContentModerationBlocked(retryError)) {
+          throw new ImageProviderError(
+            "CONTENT_MODERATION",
+            "Content moderation blocked the request"
+          );
+        }
+        throw retryError;
+      }
+    }
+  }
+
   async function runFallback(): Promise<{
-    image: string;
-    provider: string;
-    prompt: string;
+    result: ProviderResult;
     fallbackProvider: ImageFallbackProvider;
+    usedSafePrompt: boolean;
   }> {
+    const errors: unknown[] = [];
+
     if (hasGrokImagine) {
       try {
-        const grok = await runGrokImagine();
-        return { ...grok, fallbackProvider: "grok-imagine" };
-      } catch (grokError) {
-        console.warn("Grok Imagine failed:", grokError);
-        if (!hasStability) throw grokError;
+        const { result, usedSafePrompt } = await withModerationRetry(runGrokImagine);
+        return { result, fallbackProvider: "grok-imagine", usedSafePrompt };
+      } catch (error) {
+        errors.push(error);
+        console.warn("Grok Imagine failed:", error);
       }
     }
 
     if (hasStability) {
-      const stability = await runStability();
-      return { ...stability, fallbackProvider: "stability" };
+      try {
+        const { result, usedSafePrompt } = await withModerationRetry(runStability);
+        return { result, fallbackProvider: "stability", usedSafePrompt };
+      } catch (error) {
+        errors.push(error);
+        console.warn("Stability failed:", error);
+      }
     }
 
-    throw new ImageProviderError(
-      "LEONARDO_NO_TOKENS",
-      "Leonardo tokens exhausted and no fallback provider available"
-    );
+    const moderation = errors.find(isContentModerationBlocked);
+    if (moderation) {
+      throw new ImageProviderError(
+        "CONTENT_MODERATION",
+        "Content moderation blocked the request"
+      );
+    }
+
+    if (isLeonardoTokensExhausted(errors[0])) {
+      throw new ImageProviderError(
+        "LEONARDO_NO_TOKENS",
+        "Leonardo tokens exhausted"
+      );
+    }
+
+    throw errors[0] ?? new ImageProviderError("NO_PROVIDER", "No provider");
   }
 
   const tryLeonardoFirst = hasLeonardo && (options?.preferLeonardo ?? false);
 
   if (tryLeonardoFirst) {
     try {
-      return await runLeonardo();
+      const { result, usedSafePrompt } = await withModerationRetry(runLeonardo);
+      return { ...result, usedSafePrompt };
     } catch (error) {
-      if (isLeonardoTokensExhausted(error) || hasGrokImagine || hasStability) {
+      const canFallback =
+        isLeonardoTokensExhausted(error) ||
+        isContentModerationBlocked(error) ||
+        hasGrokImagine ||
+        hasStability;
+
+      if (canFallback) {
         console.warn("Leonardo unavailable — trying Grok Imagine / Stability");
         const fallback = await runFallback();
         return {
-          ...fallback,
+          ...fallback.result,
           fallbackFromLeonardo: true,
           fallbackProvider: fallback.fallbackProvider,
+          usedSafePrompt: fallback.usedSafePrompt,
         };
       }
       throw error;
@@ -144,14 +206,19 @@ export async function generateImageFromPrompt(
   }
 
   if (hasGrokImagine && !hasLeonardo) {
-    return runGrokImagine();
+    const { result, usedSafePrompt } = await withModerationRetry(runGrokImagine);
+    return { ...result, usedSafePrompt };
   }
 
   if (hasStability && !hasLeonardo) {
     try {
-      return await runStability();
+      const { result, usedSafePrompt } = await withModerationRetry(runStability);
+      return { ...result, usedSafePrompt };
     } catch (error) {
-      if (hasGrokImagine) return runGrokImagine();
+      if (hasGrokImagine && !isContentModerationBlocked(error)) {
+        const grok = await withModerationRetry(runGrokImagine);
+        return { ...grok.result, usedSafePrompt: grok.usedSafePrompt };
+      }
       throw error;
     }
   }
@@ -161,14 +228,22 @@ export async function generateImageFromPrompt(
   }
 
   try {
-    return await runLeonardo();
+    const { result, usedSafePrompt } = await withModerationRetry(runLeonardo);
+    return { ...result, usedSafePrompt };
   } catch (error) {
-    if (isLeonardoTokensExhausted(error) || hasGrokImagine || hasStability) {
+    const canFallback =
+      isLeonardoTokensExhausted(error) ||
+      isContentModerationBlocked(error) ||
+      hasGrokImagine ||
+      hasStability;
+
+    if (canFallback) {
       const fallback = await runFallback();
       return {
-        ...fallback,
+        ...fallback.result,
         fallbackFromLeonardo: true,
         fallbackProvider: fallback.fallbackProvider,
+        usedSafePrompt: fallback.usedSafePrompt,
       };
     }
     throw error;

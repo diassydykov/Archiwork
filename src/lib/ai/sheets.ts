@@ -150,7 +150,7 @@ const sheetPrompts: Record<SheetId, string> = {
   roof_plan:
     "Roof plan top view of THE SAME building, roof outline slopes drainage, scale 1:100, schematic blueprint, NO text",
   section:
-    "Building cross-section A-A of THE SAME building, cut through showing floors foundation roof structure, scale 1:100, technical section drawing, NO text",
+    "Building sectional drawing A-A of THE SAME building, interior floor levels foundation and roof structure, architectural section diagram, scale 1:100, NO text",
   perspective:
     "Photorealistic 3D exterior of THE SAME building, professional architectural render, golden hour, landscaping, consistent with design lock",
 };

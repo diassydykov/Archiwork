@@ -61,7 +61,14 @@ export async function POST(request: Request) {
     console.error("Sheet generation error:", message);
     return NextResponse.json(
       { error: message, errorCode: mapped?.code },
-      { status: mapped?.code === "LEONARDO_NO_TOKENS" ? 402 : 500 }
+      {
+        status:
+          mapped?.code === "LEONARDO_NO_TOKENS"
+            ? 402
+            : mapped?.code === "CONTENT_MODERATION"
+              ? 422
+              : 500,
+      }
     );
   }
 }

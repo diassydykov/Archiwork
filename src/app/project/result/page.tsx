@@ -123,7 +123,9 @@ function ResultContent() {
               throw new Error(
                 data.errorCode === "LEONARDO_NO_TOKENS"
                   ? t("leonardoNoTokens")
-                  : data.error || t("generationError")
+                  : data.errorCode === "CONTENT_MODERATION"
+                    ? t("contentModerationBlocked")
+                    : data.error || t("generationError")
               );
             }
 

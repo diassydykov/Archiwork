@@ -64,6 +64,8 @@ const ru = {
   generationError: "Не удалось сгенерировать изображение",
   leonardoNoTokens:
     "Токены Leonardo.ai закончились. Генерация продолжится через Grok Imagine или Stability AI (если ключи настроены). Пополните баланс на leonardo.ai.",
+  contentModerationBlocked:
+    "Запрос отклонён модерацией AI (ложное срабатывание возможно). Попробуйте упростить описание проекта: без имён людей, брендов и спорных формулировок. Нажмите «Попробовать снова».",
   grokImagineFallback:
     "Листы сгенерированы через Grok Imagine — токены Leonardo закончились. Один ключ xAI для текста и картинок.",
   stabilityFallback:
@@ -184,7 +186,9 @@ const kk: Record<TranslationKey, string> = {
   generatingHint: "Бұл бір минутқа дейін уақыт алуы мүмкін",
   generationError: "Сурет жасау сәтсіз аяқталды",
   leonardoNoTokens:
-    "Leonardo.ai токендері таусылды. Grok Imagine немесе Stability AI арқылы жалғасады. leonardo.ai-да балансты толтырыңыз.",
+    "Leonardo.ai токендері таусылды. Grok Imagine немесе Stability AI арқылы жалғасады.",
+  contentModerationBlocked:
+    "AI модерациясы сұрауды қабылдамады. Жоба сипаттамасын жеңілдетіп, қайта көріңіз.",
   grokImagineFallback:
     "Парақтар Grok Imagine арқылы жасалды — Leonardo лимиті таусылды.",
   stabilityFallback:
@@ -305,7 +309,9 @@ const en: Record<TranslationKey, string> = {
   generatingHint: "This may take up to a minute",
   generationError: "Failed to generate image",
   leonardoNoTokens:
-    "Leonardo.ai tokens exhausted. Generation continues via Grok Imagine or Stability AI if configured. Top up at leonardo.ai.",
+    "Leonardo.ai tokens exhausted. Generation continues via Grok Imagine or Stability AI.",
+  contentModerationBlocked:
+    "Request blocked by AI content moderation (false positives happen). Simplify the project description and try again.",
   grokImagineFallback:
     "Sheets generated via Grok Imagine — Leonardo limit reached. Same xAI key for text and images.",
   stabilityFallback:
