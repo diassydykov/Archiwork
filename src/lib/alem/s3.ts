@@ -39,16 +39,21 @@ async function uploadBuffer(
 
   const key = `archiwork/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    })
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      })
+    );
 
-  return getPublicUrl(key);
+    return getPublicUrl(key);
+  } catch (error) {
+    console.error("S3 upload failed:", error);
+    return null;
+  }
 }
 
 export async function uploadImageFromUrl(url: string): Promise<string | null> {

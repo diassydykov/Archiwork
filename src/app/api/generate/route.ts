@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { enhanceArchitecturalPrompt } from "@/lib/alem/qwen";
-import { persistGeneratedImages } from "@/lib/alem/s3";
+import { isS3Configured, persistGeneratedImages } from "@/lib/alem/s3";
 import { generateWithLeonardo } from "@/lib/leonardo/client";
 import { generateWithStability } from "@/lib/stability/client";
 import type { ProjectDetails } from "@/types";
+
+// Генерация может занимать до 60+ секунд (Leonardo polling)
+export const maxDuration = 60;
+
+export async function GET() {
+  return NextResponse.json({
+    leonardo: !!process.env.LEONARDO_API_KEY,
+    stability: !!process.env.STABILITY_API_KEY,
+    qwen: !!process.env.QWEN_API_KEY,
+    s3: isS3Configured(),
+  });
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +33,10 @@ export async function POST(request: Request) {
 
     if (!hasLeonardo && !hasStability) {
       return NextResponse.json(
-        { error: "No AI provider configured" },
+        {
+          error:
+            "No AI provider configured. Add LEONARDO_API_KEY and/or STABILITY_API_KEY to .env.local (local) or Vercel Environment Variables (production).",
+        },
         { status: 500 }
       );
     }
@@ -29,30 +44,42 @@ export async function POST(request: Request) {
     const prompt = await enhanceArchitecturalPrompt(project);
 
     let result: { prompt: string; provider: string; images: string[] };
+    const errors: string[] = [];
 
-    if (hasLeonardo) {
+    // Stability быстрее — пробуем первым (важно для лимита Vercel ~10–60 сек)
+    if (hasStability) {
       try {
-        result = await generateWithLeonardo(project, prompt);
-      } catch (leonardoError) {
-        console.error("Leonardo failed, trying Stability:", leonardoError);
-
-        if (!hasStability) {
-          throw leonardoError;
-        }
-
         result = await generateWithStability(project, prompt);
+      } catch (stabilityError) {
+        const msg =
+          stabilityError instanceof Error
+            ? stabilityError.message
+            : "Stability failed";
+        errors.push(msg);
+        console.error("Stability failed:", stabilityError);
+
+        if (!hasLeonardo) throw stabilityError;
+        result = await generateWithLeonardo(project, prompt);
       }
     } else {
-      result = await generateWithStability(project, prompt);
+      result = await generateWithLeonardo(project, prompt);
     }
 
-    const images = await persistGeneratedImages(result.images);
+    let images = result.images;
+    if (isS3Configured()) {
+      try {
+        images = await persistGeneratedImages(result.images);
+      } catch (s3Error) {
+        console.error("S3 persist failed, using original URLs:", s3Error);
+      }
+    }
 
     return NextResponse.json({
       ...result,
       images,
       promptEnhanced: !!process.env.QWEN_API_KEY,
       storedInS3: images.some((img) => img.includes("alem.ai")),
+      warnings: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
     const message =

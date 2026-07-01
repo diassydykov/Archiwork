@@ -42,7 +42,11 @@ function ResultContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || t("generationError"));
+        const errMsg = data.error || t("generationError");
+        if (errMsg.includes("No AI provider")) {
+          throw new Error(t("noProviderConfigured"));
+        }
+        throw new Error(errMsg);
       }
 
       setImages(data.images);
