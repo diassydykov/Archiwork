@@ -10,19 +10,82 @@ export function sheetFileName(projectTitle: string, sheetTitle: string): string 
   return `archiwork-${slugify(projectTitle)}-${slugify(sheetTitle)}.pdf`;
 }
 
+function isSvgSource(src: string): boolean {
+  return (
+    src.includes("image/svg+xml") ||
+    src.trimStart().startsWith("<svg") ||
+    src.trimStart().startsWith("<?xml")
+  );
+}
+
+async function rasterizeToPng(
+  img: HTMLImageElement,
+  fallbackWidth = 1200,
+  fallbackHeight = 900
+): Promise<{ dataUrl: string; format: "PNG"; width: number; height: number }> {
+  const width = img.naturalWidth || img.width || fallbackWidth;
+  const height = img.naturalHeight || img.height || fallbackHeight;
+  const scale = 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not available");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    format: "PNG",
+    width,
+    height,
+  };
+}
+
 async function loadImage(
   src: string
 ): Promise<{ dataUrl: string; format: "PNG" | "JPEG"; width: number; height: number }> {
+  if (isSvgSource(src)) {
+    const img = await createImageElement(src);
+    return rasterizeToPng(img);
+  }
+
   if (src.startsWith("data:")) {
     const img = await createImageElement(src);
-    const format = src.includes("image/jpeg") ? "JPEG" : "PNG";
-    return { dataUrl: src, format, width: img.naturalWidth, height: img.naturalHeight };
+    if (src.includes("image/jpeg")) {
+      return {
+        dataUrl: src,
+        format: "JPEG",
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
+    }
+    if (src.includes("image/png")) {
+      return {
+        dataUrl: src,
+        format: "PNG",
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
+    }
+    return rasterizeToPng(img);
   }
 
   const res = await fetch(src);
   if (!res.ok) throw new Error("Failed to load image");
   const blob = await res.blob();
   const dataUrl = await blobToDataUrl(blob);
+
+  if (blob.type.includes("svg")) {
+    const img = await createImageElement(dataUrl);
+    return rasterizeToPng(img);
+  }
+
   const img = await createImageElement(dataUrl);
   const format = blob.type.includes("jpeg") ? "JPEG" : "PNG";
   return {

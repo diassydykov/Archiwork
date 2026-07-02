@@ -5,13 +5,17 @@ import {
   TileLayer,
   CircleMarker,
   useMapEvents,
+  useMap,
 } from "react-leaflet";
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import type { SiteMapPickerProps } from "./site-map-types";
-import "leaflet/dist/leaflet.css";
+import { captureMapSnapshot } from "@/lib/maps/capture-map-snapshot";
 
 const ALMATY_CENTER: [number, number] = [43.238949, 76.945465];
+
+/** Тайлы через наш прокси — надёжнее, чем напрямую с openstreetmap.org */
+const TILE_URL = "/api/maps/tile?z={z}&x={x}&y={y}";
 
 function MapClickHandler({
   onClick,
@@ -26,6 +30,25 @@ function MapClickHandler({
   return null;
 }
 
+/** Пересчёт размеров после монтирования (fix: один тайл в углу) */
+function MapInvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const fix = () => map.invalidateSize({ animate: false });
+    const t1 = setTimeout(fix, 0);
+    const t2 = setTimeout(fix, 200);
+    const t3 = setTimeout(fix, 600);
+    window.addEventListener("resize", fix);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener("resize", fix);
+    };
+  }, [map]);
+  return null;
+}
+
 export function SiteMapPickerOsm({
   latitude,
   longitude,
@@ -34,6 +57,7 @@ export function SiteMapPickerOsm({
   const { t } = useI18n();
   const [resolving, setResolving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [snapshotPreview, setSnapshotPreview] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -46,12 +70,31 @@ export function SiteMapPickerOsm({
     async (lat: number, lng: number) => {
       setResolving(true);
       try {
+        let mapSnapshot: string | undefined;
+        let mapCaptureZoom: number | undefined;
+        let mapCaptureWidth: number | undefined;
+        let mapCaptureHeight: number | undefined;
+        try {
+          const captured = await captureMapSnapshot(lat, lng);
+          mapSnapshot = captured.dataUrl;
+          mapCaptureZoom = captured.zoom;
+          mapCaptureWidth = captured.width;
+          mapCaptureHeight = captured.height;
+          setSnapshotPreview(mapSnapshot);
+        } catch {
+          /* snapshot optional */
+        }
+
         const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
         const data = await res.json();
         onLocationChange({
           latitude: lat,
           longitude: lng,
           address: data.address ?? undefined,
+          mapSnapshot,
+          mapCaptureZoom,
+          mapCaptureWidth,
+          mapCaptureHeight,
         });
       } catch {
         onLocationChange({ latitude: lat, longitude: lng });
@@ -100,18 +143,22 @@ export function SiteMapPickerOsm({
       </p>
       <div
         className="overflow-hidden rounded-xl"
-        style={{ border: "1px solid var(--border)" }}
+        style={{ border: "1px solid var(--border)", height: 320, width: "100%" }}
       >
         <MapContainer
           center={position ?? ALMATY_CENTER}
-          zoom={position ? 17 : 11}
-          style={{ height: 320, width: "100%" }}
+          zoom={position ? 17 : 6}
+          style={{ height: "100%", width: "100%" }}
           scrollWheelZoom
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            url={TILE_URL}
+            tileSize={256}
+            maxZoom={19}
+            minZoom={3}
           />
+          <MapInvalidateSize />
           <MapClickHandler onClick={handleClick} />
           {position && (
             <CircleMarker
@@ -127,15 +174,34 @@ export function SiteMapPickerOsm({
           )}
         </MapContainer>
       </div>
-      {resolving && (
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {t("mapResolving")}
-        </p>
-      )}
       {position && !resolving && (
         <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
           {t("mapCoords")}: {position[0].toFixed(6)}, {position[1].toFixed(6)}
         </p>
+      )}
+      {resolving && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {t("mapCapturing")}
+        </p>
+      )}
+      {snapshotPreview && (
+        <div
+          className="mt-2 overflow-hidden rounded-xl"
+          style={{ border: "1px solid var(--border)" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={snapshotPreview}
+            alt={t("siteBinding")}
+            className="w-full bg-[#e5e7eb]"
+          />
+          <p
+            className="px-2 py-1 text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {t("mapSnapshotSaved")}
+          </p>
+        </div>
       )}
     </div>
   );

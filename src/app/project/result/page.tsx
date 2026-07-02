@@ -20,6 +20,21 @@ import {
   printSpecification,
   sheetFileName,
 } from "@/lib/pdf/sheet-export";
+import {
+  getVectorFloorLevel,
+  layoutHasFloor,
+  layoutSummaryForPrompt,
+  layoutToDesignLock,
+} from "@/lib/layout/summary";
+import { isVectorSheet } from "@/lib/layout/render-sheet";
+import {
+  clearResultCache,
+  hydrateVectorSheets,
+  loadResultCache,
+  saveResultCache,
+  vectorSheetsNeedHydration,
+} from "@/lib/project/result-cache";
+import type { BuildingLayout } from "@/lib/layout/schema";
 import type { ProjectDetails, ProjectSheetResult } from "@/types";
 
 export default function ProjectResultPage() {
@@ -46,6 +61,9 @@ function ResultContent() {
   const [fallbackNotice, setFallbackNotice] = useState<
     "grok-imagine" | "stability" | null
   >(null);
+  const [buildingLayout, setBuildingLayout] = useState<BuildingLayout | null>(
+    null
+  );
 
   const projectTitle =
     project?.buildingType === "residential"
@@ -65,6 +83,7 @@ function ResultContent() {
       setSpecification("");
       setSheets([]);
       setDesignLock("");
+      setBuildingLayout(null);
       setFallbackNotice(null);
       setPhase("spec");
 
@@ -83,16 +102,23 @@ function ResultContent() {
         const spec = specData.specification as string;
         setSpecification(spec);
 
-        const lockRes = await fetch("/api/project/design-lock", {
+        const layoutRes = await fetch("/api/project/layout", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ project: projectData, specification: spec }),
         });
-        const lockData = await lockRes.json();
-        const lock = lockRes.ok
-          ? (lockData.designLock as string)
-          : "";
+        const layoutData = await layoutRes.json();
+        if (!layoutRes.ok) {
+          throw new Error(layoutData.error || t("generationError"));
+        }
+
+        const layoutCache = layoutData.layout as BuildingLayout;
+        setBuildingLayout(layoutCache);
+
+        const lock = layoutToDesignLock(layoutCache, projectData.buildingType);
         setDesignLock(lock);
+
+        const layoutSummary = layoutSummaryForPrompt(layoutCache);
 
         setPhase("sheets");
 
@@ -103,9 +129,48 @@ function ResultContent() {
         for (let i = 0; i < sheetDefs.length; i++) {
           const sheet = sheetDefs[i];
           setSheetProgress({ current: i + 1, total: sheetDefs.length });
-          setCurrentSheetTitle(t(sheet.titleKey));
+
+          const floorLevel = getVectorFloorLevel(sheet.id);
+          const useVector = isVectorSheet(sheet.id) && (
+            sheet.id === "site_plan_map"
+              ? !!projectData.mapSnapshot
+              : floorLevel === null
+                ? true
+                : layoutHasFloor(layoutCache, floorLevel)
+          );
+
+          setCurrentSheetTitle(
+            useVector ? t("generatingVectorSheet") : t(sheet.titleKey)
+          );
 
           try {
+            if (useVector) {
+              const res = await fetch("/api/project/vector-sheet", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  project: projectData,
+                  specification: spec,
+                  layout: layoutCache,
+                  sheetId: sheet.id,
+                  floorLevel: floorLevel ?? 1,
+                  sheetTitle: t(sheet.titleKey),
+                  projectTitle,
+                  mapSnapshot: projectData.mapSnapshot,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || t("generationError"));
+
+              results.push({
+                id: sheet.id,
+                titleKey: sheet.titleKey,
+                image: data.image,
+                provider: "vector",
+              });
+              continue;
+            }
+
             const res = await fetch("/api/project/sheet", {
               method: "POST",
               headers: { "content-type": "application/json" },
@@ -114,6 +179,7 @@ function ResultContent() {
                 sheet,
                 specSummary,
                 designLock: lock,
+                layoutSummary,
                 referenceImageId,
               }),
             });
@@ -163,17 +229,19 @@ function ResultContent() {
         }
 
         setPhase("done");
-        sessionStorage.setItem(
-          "archiwork-project-result",
-          JSON.stringify({ specification: spec, designLock: lock, sheets: results })
-        );
+        saveResultCache({
+          specification: spec,
+          designLock: lock,
+          layout: layoutCache,
+          sheets: results,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : t("generationError"));
       } finally {
         setLoading(false);
       }
     },
-    [t]
+    [t, projectTitle]
   );
 
   useEffect(() => {
@@ -186,24 +254,48 @@ function ResultContent() {
     const parsed = JSON.parse(raw) as ProjectDetails;
     setProject(parsed);
 
-    const cached = sessionStorage.getItem("archiwork-project-result");
+    const title =
+      parsed.buildingType === "residential"
+        ? t("residentialProject")
+        : t("commercialProject");
+
+    const cached = loadResultCache();
     if (cached) {
-      try {
-        const data = JSON.parse(cached);
-        if (data.specification && data.sheets?.length) {
-          setSpecification(data.specification);
-          if (data.designLock) setDesignLock(data.designLock);
-          setSheets(data.sheets);
-          setPhase("done");
-          return;
-        }
-      } catch {
-        /* regenerate */
+      setSpecification(cached.specification);
+      if (cached.designLock) setDesignLock(cached.designLock);
+      if (cached.layout) setBuildingLayout(cached.layout);
+      setSheets(cached.sheets);
+      setPhase("done");
+
+      if (cached.layout && vectorSheetsNeedHydration(cached.sheets)) {
+        setLoading(true);
+        hydrateVectorSheets(
+          parsed,
+          cached.layout,
+          cached.specification,
+          cached.sheets,
+          {
+            projectTitle: title,
+            sheetTitle: (key) => t(key),
+            errorLabel: t("generationError"),
+          }
+        )
+          .then((hydrated) => {
+            setSheets(hydrated);
+            saveResultCache({
+              specification: cached.specification,
+              designLock: cached.designLock ?? "",
+              layout: cached.layout!,
+              sheets: hydrated,
+            });
+          })
+          .finally(() => setLoading(false));
       }
+      return;
     }
 
     generatePackage(parsed);
-  }, [router, generatePackage]);
+  }, [router, generatePackage, t]);
 
   const handleDownloadAllPdf = async () => {
     if (!project) return;
@@ -477,7 +569,7 @@ function ResultContent() {
                 <Button
                   variant="secondary"
                   onClick={() => {
-                    sessionStorage.removeItem("archiwork-project-result");
+                    clearResultCache();
                     router.push("/dashboard");
                   }}
                 >
@@ -485,7 +577,7 @@ function ResultContent() {
                 </Button>
                 <Button
                   onClick={() => {
-                    sessionStorage.removeItem("archiwork-project-result");
+                    clearResultCache();
                     generatePackage(project);
                   }}
                 >
@@ -499,6 +591,26 @@ function ResultContent() {
         <Footer />
       </div>
     </div>
+  );
+}
+
+function SheetImage({ src, alt }: { src: string; alt: string }) {
+  if (src.startsWith("data:") || src.startsWith("blob:")) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt} className="h-auto w-full bg-white" />
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={1024}
+      height={1024}
+      className="h-auto w-full bg-white"
+      unoptimized
+    />
   );
 }
 
@@ -530,10 +642,41 @@ function ActionButton({
 
 function SiteBindingSection({ project }: { project: ProjectDetails }) {
   const { t } = useI18n();
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+
+  useEffect(() => {
+    if (project.mapSnapshot || project.latitude == null) return;
+    let cancelled = false;
+    setCapturing(true);
+    (async () => {
+      try {
+        const { captureMapSnapshot } = await import(
+          "@/lib/maps/capture-map-snapshot"
+        );
+        const snap = await captureMapSnapshot(
+          project.latitude!,
+          project.longitude!
+        );
+        if (!cancelled) setFallbackUrl(snap.dataUrl);
+      } catch {
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) setCapturing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [project.latitude, project.longitude, project.mapSnapshot]);
 
   if (project.latitude == null || project.longitude == null) return null;
 
-  const mapUrl = `/api/maps/static?lat=${project.latitude}&lng=${project.longitude}&width=800&height=400`;
+  const mapSrc =
+    project.mapSnapshot ??
+    fallbackUrl ??
+    `/api/maps/static?lat=${project.latitude}&lng=${project.longitude}&width=800&height=400`;
 
   return (
     <section
@@ -555,14 +698,23 @@ function SiteBindingSection({ project }: { project: ProjectDetails }) {
           {project.location}
         </p>
       )}
-      <Image
-        src={mapUrl}
-        alt={t("siteBinding")}
-        className="w-full rounded-xl"
-        width={800}
-        height={400}
-        unoptimized
-      />
+      {capturing && !project.mapSnapshot && !fallbackUrl ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {t("mapCapturing")}
+        </p>
+      ) : loadError && !project.mapSnapshot && !fallbackUrl ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {t("mapSnapshotError")}
+        </p>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={mapSrc}
+          alt={t("siteBinding")}
+          className="w-full rounded-xl bg-[#e5e7eb] min-h-[200px]"
+          onError={() => setLoadError(true)}
+        />
+      )}
       <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
         {t("mapCoords")}: {project.latitude!.toFixed(6)},{" "}
         {project.longitude!.toFixed(6)}
@@ -619,12 +771,22 @@ function SheetCard({
         className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3"
         style={{ borderColor: "var(--border)" }}
       >
-        <span
-          className="text-sm font-medium"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {title}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span
+            className="text-sm font-medium"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {title}
+          </span>
+          {sheet.provider === "vector" && (
+            <span
+              className="text-xs"
+              style={{ color: "var(--accent)" }}
+            >
+              {t("vectorSheetBadge")}
+            </span>
+          )}
+        </div>
         {sheet.image && (
           <div className="flex gap-2">
             <ActionButton
@@ -637,14 +799,7 @@ function SheetCard({
         )}
       </div>
       {sheet.image ? (
-        <Image
-          src={sheet.image}
-          alt={title}
-          width={1024}
-          height={1024}
-          className="h-auto w-full bg-white"
-          unoptimized
-        />
+        <SheetImage src={sheet.image} alt={title} />
       ) : (
         <div
           className="flex min-h-[200px] items-center justify-center p-6 text-sm"

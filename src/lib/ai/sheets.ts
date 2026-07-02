@@ -3,6 +3,7 @@ import { LEONARDO_PROMPT_MAX_LENGTH, truncatePrompt } from "@/lib/ai/prompt-limi
 
 export type SheetId =
   | "site_plan"
+  | "site_plan_map"
   | "floor_1"
   | "floor_2"
   | "floor_3"
@@ -22,6 +23,7 @@ export interface SheetDefinition {
 
 export type SheetTitleKey =
   | "sheetSitePlan"
+  | "sheetSitePlanMap"
   | "sheetFloor1"
   | "sheetFloor2"
   | "sheetFloor3"
@@ -50,6 +52,15 @@ export function getProjectSheets(project: ProjectDetails): SheetDefinition[] {
       blueprint: true,
     },
   ];
+
+  if (project.mapSnapshot && project.latitude != null) {
+    sheets.push({
+      id: "site_plan_map",
+      titleKey: "sheetSitePlanMap",
+      aspectRatio: "16:9",
+      blueprint: false,
+    });
+  }
 
   for (let i = 1; i <= floorCount; i++) {
     const id = `floor_${i}` as SheetId;
@@ -134,25 +145,27 @@ function projectContext(project: ProjectDetails): string {
 
 const sheetPrompts: Record<SheetId, string> = {
   site_plan:
-    "Site master plan top view of THE SAME building from design lock, building footprint on plot, driveway, parking, landscaping, north arrow, scale 1:500, unlabeled schematic blueprint",
+    "Site master plan — vector generated separately",
+  site_plan_map:
+    "Site plan on real map — vector generated separately",
   floor_1:
-    "First floor plan top view of THE SAME building, walls doors windows staircase, unlabeled room rectangles, furniture outlines only, scale 1:100, pure black lines on white, NO text",
+    "First floor plan — vector generated separately",
   floor_2:
-    "Second floor plan top view of THE SAME building, bedrooms bathrooms balconies, unlabeled room rectangles, scale 1:100, pure black lines on white, NO text",
+    "Second floor plan — vector generated separately",
   floor_3:
-    "Third floor plan top view of THE SAME building, unlabeled room rectangles, scale 1:100, pure black lines on white, NO text",
+    "Third floor plan — vector generated separately",
   front_elevation:
-    "Front elevation of THE SAME building, main facade facing viewer, window and door openings, materials, scale 1:100, technical blueprint black lines on white, NO text",
+    "Front elevation — vector generated separately",
   side_elevation:
-    "Left side elevation of THE SAME building, height levels, roof profile, scale 1:100, technical blueprint, NO text",
+    "Side elevation — vector generated separately",
   rear_elevation:
-    "Rear elevation of THE SAME building, back facade terrace windows, scale 1:100, technical blueprint, NO text",
+    "Rear elevation — vector generated separately",
   roof_plan:
-    "Roof plan top view of THE SAME building, roof outline slopes drainage, scale 1:100, schematic blueprint, NO text",
+    "Roof plan — vector generated separately",
   section:
     "Building sectional drawing A-A of THE SAME building, interior floor levels foundation and roof structure, architectural section diagram, scale 1:100, NO text",
   perspective:
-    "Photorealistic 3D exterior of THE SAME building, professional architectural render, golden hour, landscaping, consistent with design lock",
+    "Photorealistic 3D exterior perspective from south-west corner, showing MAIN FRONT FACADE (south) with entrance visible, rectangular footprint from layout, exact floor count, hip roof, modern private house, landscaped plot with driveway, golden hour lighting, professional architectural visualization, must match vector floor plans exactly",
 };
 
 export function buildSheetPrompt(
@@ -161,11 +174,13 @@ export function buildSheetPrompt(
   options?: {
     specSummary?: string;
     designLock?: string;
+    layoutSummary?: string;
     maxLength?: number;
   }
 ): string {
   const specSummary = options?.specSummary;
   const designLock = options?.designLock;
+  const layoutSummary = options?.layoutSummary;
   const maxLength = options?.maxLength ?? LEONARDO_PROMPT_MAX_LENGTH;
 
   const base = sheetPrompts[sheet.id];
@@ -173,12 +188,16 @@ export function buildSheetPrompt(
     " Pure schematic line art. NO text, NO labels, NO letters, NO numbers, NO annotations, NO handwriting. Black ink on white background. CAD documentation style. Same building as all other sheets.";
 
   const lockPrefix = designLock
-    ? `ONE PROJECT — design lock (must match exactly): ${truncatePrompt(designLock, 400)}. `
+    ? `ONE PROJECT — design lock (must match exactly): ${truncatePrompt(designLock, 320)}. `
+    : "";
+
+  const layoutPrefix = layoutSummary
+    ? `AUTHORITATIVE LAYOUT DATA: ${truncatePrompt(layoutSummary, 450)}. `
     : "";
 
   const header = sheet.blueprint
-    ? `${lockPrefix}Professional architectural technical drawing. ${base}.`
-    : `${lockPrefix}Professional architectural visualization. ${base}.`;
+    ? `${lockPrefix}${layoutPrefix}Professional architectural technical drawing. ${base}.`
+    : `${lockPrefix}${layoutPrefix}Professional architectural visualization. ${base}.`;
   const footer = sheet.blueprint ? blueprintSuffix : " Same building as design lock.";
 
   const overhead = header.length + footer.length + 32;

@@ -44,6 +44,10 @@ export function ProjectDetailsForm({
   const [additional, setAdditional] = useState("");
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
+  const [mapSnapshot, setMapSnapshot] = useState<string | undefined>();
+  const [mapCaptureZoom, setMapCaptureZoom] = useState<number | undefined>();
+  const [mapCaptureWidth, setMapCaptureWidth] = useState<number | undefined>();
+  const [mapCaptureHeight, setMapCaptureHeight] = useState<number | undefined>();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -71,6 +75,10 @@ export function ProjectDetailsForm({
       additional,
       latitude,
       longitude,
+      mapSnapshot,
+      mapCaptureZoom,
+      mapCaptureWidth,
+      mapCaptureHeight,
     });
   };
 
@@ -96,9 +104,13 @@ export function ProjectDetailsForm({
       <SiteMapPicker
         latitude={latitude}
         longitude={longitude}
-        onLocationChange={({ latitude: lat, longitude: lng, address }) => {
+        onLocationChange={({ latitude: lat, longitude: lng, address, mapSnapshot: snap, mapCaptureZoom: z, mapCaptureWidth: cw, mapCaptureHeight: ch }) => {
           setLatitude(lat);
           setLongitude(lng);
+          if (snap) setMapSnapshot(snap);
+          if (z != null) setMapCaptureZoom(z);
+          if (cw != null) setMapCaptureWidth(cw);
+          if (ch != null) setMapCaptureHeight(ch);
           if (address) setLocation(address);
         }}
       />

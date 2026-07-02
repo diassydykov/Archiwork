@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @custom-variant accessible (&:where([data-theme="accessible"], [data-theme="accessible"] *));
@@ -122,4 +123,17 @@ textarea {
 
 .animate-slide-up {
   animation: slide-up 0.5s ease-out forwards;
+}
+
+/* Leaflet: без этих правил карта показывает только 1 тайл в углу */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  font-family: inherit;
+}
+
+.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
 }

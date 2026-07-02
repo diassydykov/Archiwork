@@ -1,13 +1,13 @@
 import type { SheetDefinition, SheetId } from "@/lib/ai/sheets";
 import type { ProjectSheetResult } from "@/types";
 
-/** Perspective first — becomes style reference for other sheets. */
+/** Vector sheets first (fast), 3D perspective last (slow AI). */
 export function getSheetGenerationOrder(
   sheets: SheetDefinition[]
 ): SheetDefinition[] {
   const perspective = sheets.find((s) => s.id === "perspective");
   const rest = sheets.filter((s) => s.id !== "perspective");
-  return perspective ? [perspective, ...rest] : sheets;
+  return perspective ? [...rest, perspective] : sheets;
 }
 
 export function sheetUsesReferenceImage(sheetId: SheetId): boolean {

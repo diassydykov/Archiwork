@@ -22,6 +22,12 @@ export interface ProjectDetails {
   additional: string;
   latitude?: number;
   longitude?: number;
+  /** PNG data URL — map snapshot at picked coordinates */
+  mapSnapshot?: string;
+  /** OSM zoom used when mapSnapshot was captured */
+  mapCaptureZoom?: number;
+  mapCaptureWidth?: number;
+  mapCaptureHeight?: number;
 }
 
 export interface ProjectSheetResult {

@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
-import { getGoogleMapsApiKey } from "@/lib/maps/config";
-import { buildOsmStaticMapUrl } from "@/lib/maps/osm";
-import { getMapProvider } from "@/lib/maps/provider";
-import { buildStaticMapUrl } from "@/lib/maps/static";
+import { tileDrawPosition, tilesForViewport } from "@/lib/maps/tile-math";
+
+const USER_AGENT = "Archiwork/1.0 (archiwork; map-tile-proxy)";
+
+async function fetchTileBase64(
+  z: number,
+  x: number,
+  y: number,
+  attempts = 3
+): Promise<string> {
+  let lastError: Error | undefined;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(
+        `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+        {
+          headers: { "User-Agent": USER_AGENT },
+          next: { revalidate: 86400 },
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      return buf.toString("base64");
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("tile");
+      await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+    }
+  }
+  throw lastError ?? new Error("tile");
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,56 +52,47 @@ export async function GET(request: Request) {
   const h = Math.min(Math.max(height, 100), 1280);
   const z = Math.min(Math.max(zoom, 1), 19);
 
-  const provider = getMapProvider();
-  const googleKey = getGoogleMapsApiKey();
+  try {
+    const { tiles, left, top, canvasW, canvasH } = tilesForViewport(
+      latitude,
+      longitude,
+      w,
+      h,
+      z
+    );
 
-  let mapUrl: string | null = null;
-
-  if (provider === "google" && googleKey) {
-    mapUrl = buildStaticMapUrl(latitude, longitude, {
-      width: w,
-      height: h,
-      zoom: z,
-    });
-  } else {
-    mapUrl = buildOsmStaticMapUrl(latitude, longitude, w, h, z);
-  }
-
-  if (!mapUrl) {
-    mapUrl = buildOsmStaticMapUrl(latitude, longitude, w, h, z);
-  }
-
-  const res = await fetch(mapUrl);
-  if (!res.ok && provider === "google" && googleKey) {
-    const osmUrl = buildOsmStaticMapUrl(latitude, longitude, w, h, z);
-    const osmRes = await fetch(osmUrl);
-    if (!osmRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to load static map" },
-        { status: osmRes.status }
-      );
+    let images = "";
+    for (const tile of tiles) {
+      try {
+        const b64 = await fetchTileBase64(tile.z, tile.x, tile.y);
+        const { px, py } = tileDrawPosition(tile, left, top);
+        images += `<image href="data:image/png;base64,${b64}" x="${px}" y="${py}" width="256" height="256"/>`;
+      } catch {
+        const { px, py } = tileDrawPosition(tile, left, top);
+        images += `<rect x="${px}" y="${py}" width="256" height="256" fill="#e5e7eb"/>`;
+      }
     }
-    const image = await osmRes.arrayBuffer();
-    return new NextResponse(image, {
+
+    const mx = w / 2;
+    const my = h / 2;
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">
+  <rect width="100%" height="100%" fill="#e5e7eb"/>
+  ${images}
+  <circle cx="${mx}" cy="${my - 6}" r="10" fill="#2563eb"/>
+  <polygon points="${mx},${my + 14} ${mx - 8},${my} ${mx + 8},${my}" fill="#2563eb"/>
+</svg>`;
+
+    return new NextResponse(svg, {
       headers: {
-        "Content-Type": osmRes.headers.get("Content-Type") ?? "image/png",
+        "Content-Type": "image/svg+xml",
         "Cache-Control": "private, max-age=3600",
       },
     });
-  }
-
-  if (!res.ok) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to load static map" },
-      { status: res.status }
+      { status: 502 }
     );
   }
-
-  const image = await res.arrayBuffer();
-  return new NextResponse(image, {
-    headers: {
-      "Content-Type": res.headers.get("Content-Type") ?? "image/png",
-      "Cache-Control": "private, max-age=3600",
-    },
-  });
 }
